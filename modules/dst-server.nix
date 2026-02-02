@@ -41,9 +41,52 @@ let
     '';
   };
 
-  # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
+  # Extract libnettle6 from Debian package
+  # DST server needs libnettle.so.6 (older nettle version)
+  libnettle6 = pkgs.stdenv.mkDerivation {
+    pname = "libnettle6";
+    version = "3.4.1";
+
+    src = pkgs.fetchurl {
+      url = "http://snapshot.debian.org/archive/debian/20190323T031635Z/pool/main/n/nettle/libnettle6_3.4.1-1_amd64.deb";
+      sha256 = "sha256-WjhMdzrmiwx5BezAq/XkWSV5S2eWdIZtd4PYh4b/sNI=";
+    };
+
+    nativeBuildInputs = [ pkgs.dpkg ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libnettle.so* $out/lib/
+    '';
+  };
+
+  # Extract libldap from Debian package
+  # DST server needs libldap_r-2.4.so.2 (older openldap version)
+  libldap24 = pkgs.stdenv.mkDerivation {
+    pname = "libldap-2.4";
+    version = "2.4.47";
+
+    src = pkgs.fetchurl {
+      url = "http://snapshot.debian.org/archive/debian/20190323T031635Z/pool/main/o/openldap/libldap-2.4-2_2.4.47%2Bdfsg-3_amd64.deb";
+      sha256 = "sha256-Sk0JCEtEm5WWuRufJ8CGp2VBCUjaB5/RURwBHJFanBw=";
+    };
+
+    nativeBuildInputs = [ pkgs.dpkg ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libldap*.so* $out/lib/
+      cp -P usr/lib/x86_64-linux-gnu/liblber*.so* $out/lib/
+    '';
+  };
+
+  # Wrapper script with old Debian libraries in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls nettle libidn2 nghttp2 libpsl rtmpdump openldap ])}"
+    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs ])}"
     exec ${serverBin} "$@"
   '';
 
@@ -337,7 +380,7 @@ in {
       isSystemUser = true;
       group = cfg.group;
       home = cfg.dataDir;
-      createHome = true;
+      createHome = false;  # Let tmpfiles.rules create with correct permissions (0755)
       description = "Don't Starve Together server user";
     };
 
