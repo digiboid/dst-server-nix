@@ -86,7 +86,7 @@ let
 
   # Wrapper script with old Debian libraries in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs ])}"
+    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs cyrus_sasl ])}"
     exec ${serverBin} "$@"
   '';
 
