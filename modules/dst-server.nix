@@ -28,7 +28,7 @@ let
 
     src = pkgs.fetchurl {
       url = "http://snapshot.debian.org/archive/debian/20190323T031635Z/pool/main/c/curl/libcurl3-gnutls_7.64.0-2_amd64.deb";
-      sha256 = "sha256-hH0nei2qPTKkHTmH8OAkRdqV5oxjHoqwZPU5iK6JVQQ=";
+      sha256 = "sha256-UGA5xyYBonSgxRCRQ5hGvgq4LyXaA3DJCF2riLcvu/U=";
     };
 
     nativeBuildInputs = [ pkgs.dpkg ];
