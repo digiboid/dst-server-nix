@@ -20,31 +20,31 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Patch the DST binary to use regular libcurl instead of libcurl-gnutls
-  # Since we can't easily get libcurl-gnutls on NixOS, patch the binary
-  patchedServerBin = pkgs.runCommand "dst-server-patched" {
-    nativeBuildInputs = [ pkgs.patchelf ];
-  } ''
-    mkdir -p $out/bin
-    # Wait for server to be installed, then patch it
-    cat > $out/bin/dst-server-wrapper <<'EOF'
-#!/bin/sh
-if [ ! -f "${serverBin}" ]; then
-  echo "DST server binary not found at ${serverBin}"
-  exit 1
-fi
+  # Extract libcurl-gnutls from Debian package (Debian has stable URLs)
+  libcurlGnutls = pkgs.stdenv.mkDerivation {
+    pname = "libcurl-gnutls";
+    version = "7.88.1";
 
-# Patch the binary to use libcurl instead of libcurl-gnutls
-${pkgs.patchelf}/bin/patchelf --replace-needed libcurl-gnutls.so.4 libcurl.so.4 "${serverBin}" 2>/dev/null || true
+    src = pkgs.fetchurl {
+      url = "http://snapshot.debian.org/archive/debian/20230520T084048Z/pool/main/c/curl/libcurl3-gnutls_7.88.1-10_amd64.deb";
+      sha256 = "sha256-H6C8PzV+JvQ43z05SH/IcLxH6z6m6cHVHjc2VYrqrPE=";
+    };
 
-# Run with proper library path
-export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [ curl glibc stdenv.cc.cc.lib zlib ])}"
-exec "${serverBin}" "$@"
-EOF
-    chmod +x $out/bin/dst-server-wrapper
+    nativeBuildInputs = [ pkgs.dpkg ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libcurl-gnutls.so* $out/lib/
+    '';
+  };
+
+  # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
+  wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
+    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls nettle ])}"
+    exec ${serverBin} "$@"
   '';
-
-  wrappedServerBin = "${patchedServerBin}/bin/dst-server-wrapper";
 
   # Generate dedicated_server_mods_setup.lua from mods list
   modsSetupContent = ''
