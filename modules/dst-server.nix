@@ -89,6 +89,7 @@ EOF
     # Auto-update server if enabled
     ${optionalString cfg.autoUpdate ''
       echo "Updating DST server..."
+      mkdir -p ${cfg.serverInstallDir}
       ${pkgs.steamcmd}/bin/steamcmd \
         +force_install_dir ${cfg.serverInstallDir} \
         +login anonymous \
@@ -113,9 +114,6 @@ EOF
         -shard ${shardName} || true
     fi
 
-    # Fix permissions
-    chown -R ${cfg.user}:${cfg.group} ${cfg.dataDir}
-    chown -R ${cfg.user}:${cfg.group} ${cfg.serverInstallDir}
   '';
 
   # Common service configuration
@@ -145,11 +143,19 @@ EOF
       ReadWritePaths = [ cfg.dataDir cfg.serverInstallDir ];
     };
 
-    path = with pkgs; [ steamcmd bash coreutils glibc ];
+    path = with pkgs; [ steamcmd bash coreutils glibc curl ];
 
     environment = {
       HOME = cfg.dataDir;
-      LD_LIBRARY_PATH = "${pkgs.glibc}/lib:${pkgs.stdenv.cc.cc.lib}/lib";
+      LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
+        glibc
+        stdenv.cc.cc.lib
+        curl
+        libGL
+        libpulseaudio
+        openal
+        SDL2
+      ]);
     };
   };
 
