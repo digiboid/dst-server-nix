@@ -20,32 +20,9 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Extract libcurl-gnutls from Ubuntu package
-  # DST server specifically requires this GnuTLS variant
-  libcurlGnutls = pkgs.stdenv.mkDerivation {
-    pname = "libcurl-gnutls";
-    version = "8.5.0";
-
-    src = pkgs.fetchurl {
-      url = "http://archive.ubuntu.com/ubuntu/pool/main/c/curl/libcurl3-gnutls_8.5.0-2ubuntu10.6_amd64.deb";
-      hash = "sha256-wJmRo004Y+JlzKGd+uiUgeAdtyaZ6RlSdBl5ntL90mU=";
-    };
-
-    nativeBuildInputs = [ pkgs.dpkg pkgs.autoPatchelfHook ];
-    buildInputs = with pkgs; [ gnutls nettle gmp libidn2 nghttp2 libpsl zlib ];
-
-    unpackPhase = "dpkg-deb -x $src .";
-
-    installPhase = ''
-      mkdir -p $out/lib
-      cp -P usr/lib/x86_64-linux-gnu/libcurl-gnutls.so* $out/lib/
-    '';
-  };
-
-  # Wrap the server with proper library path
+  # Use steam-run-free which provides a complete FHS environment for Steam games
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapped" ''
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath [ libcurlGnutls pkgs.gnutls pkgs.nettle pkgs.gmp pkgs.libidn2 pkgs.nghttp2 pkgs.libpsl pkgs.zlib ]}"
-    exec ${serverBin} "$@"
+    exec ${pkgs.steam-run-free}/bin/steam-run ${serverBin} "$@"
   '';
 
   # Generate dedicated_server_mods_setup.lua from mods list
