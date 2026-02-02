@@ -108,7 +108,8 @@ let
   # Wrapper script with old Debian libraries in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
     export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${libsasl2}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs ])}"
-    exec ${serverBin} "$@"
+    cd ${cfg.serverInstallDir}/bin64
+    exec ./dontstarve_dedicated_server_nullrenderer_x64 "$@"
   '';
 
   # Generate dedicated_server_mods_setup.lua from mods list
