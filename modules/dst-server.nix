@@ -20,10 +20,22 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Use steam-run-free which provides a complete FHS environment for Steam games
-  wrappedServerBin = pkgs.writeShellScript "dst-server-wrapped" ''
-    exec ${pkgs.steam-run-free}/bin/steam-run ${serverBin} "$@"
-  '';
+  # Build an FHS environment with Steam runtime libraries
+  # This includes libcurl-gnutls which DST server requires
+  dstFhs = pkgs.buildFHSEnv {
+    name = "dst-server-fhs";
+    targetPkgs = pkgs: (with pkgs; [
+      # Steam runtime provides the libraries DST needs
+      steamPackages.steam-runtime
+    ]);
+    runScript = pkgs.writeShellScript "run-dst" ''
+      # Steam runtime libraries are in specific paths
+      export LD_LIBRARY_PATH="${pkgs.steamPackages.steam-runtime}/lib:${pkgs.steamPackages.steam-runtime}/lib/i386-linux-gnu:${pkgs.steamPackages.steam-runtime}/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+      exec ${serverBin} "$@"
+    '';
+  };
+
+  wrappedServerBin = "${dstFhs}/bin/dst-server-fhs";
 
   # Generate dedicated_server_mods_setup.lua from mods list
   modsSetupContent = ''
