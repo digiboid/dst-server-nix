@@ -20,29 +20,9 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Extract libcurl-gnutls from Debian package (Debian has stable URLs)
-  libcurlGnutls = pkgs.stdenv.mkDerivation {
-    pname = "libcurl-gnutls";
-    version = "7.88.1";
-
-    src = pkgs.fetchurl {
-      url = "http://snapshot.debian.org/archive/debian/20230520T084048Z/pool/main/c/curl/libcurl3-gnutls_7.88.1-10_amd64.deb";
-      sha256 = "sha256-7643qDkgOkfrKqAoTaKBx9BK+o38X5J3dyDCHorh34c=";
-    };
-
-    nativeBuildInputs = [ pkgs.dpkg ];
-
-    unpackPhase = "dpkg-deb -x $src .";
-
-    installPhase = ''
-      mkdir -p $out/lib
-      cp -P usr/lib/x86_64-linux-gnu/libcurl-gnutls.so* $out/lib/
-    '';
-  };
-
-  # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
+  # Wrapper script - nixpkgs curl already includes libcurl-gnutls.so.4
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls nettle ])}"
+    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [ curl glibc stdenv.cc.cc.lib zlib gnutls nettle ])}"
     exec ${serverBin} "$@"
   '';
 
