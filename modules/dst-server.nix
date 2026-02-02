@@ -20,22 +20,31 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Build an FHS environment with Steam runtime libraries
-  # This includes libcurl-gnutls which DST server requires
-  dstFhs = pkgs.buildFHSEnv {
-    name = "dst-server-fhs";
-    targetPkgs = pkgs: (with pkgs; [
-      # Steam runtime provides the libraries DST needs
-      steamPackages.steam-runtime
-    ]);
-    runScript = pkgs.writeShellScript "run-dst" ''
-      # Steam runtime libraries are in specific paths
-      export LD_LIBRARY_PATH="${pkgs.steamPackages.steam-runtime}/lib:${pkgs.steamPackages.steam-runtime}/lib/i386-linux-gnu:${pkgs.steamPackages.steam-runtime}/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
-      exec ${serverBin} "$@"
-    '';
-  };
+  # Patch the DST binary to use regular libcurl instead of libcurl-gnutls
+  # Since we can't easily get libcurl-gnutls on NixOS, patch the binary
+  patchedServerBin = pkgs.runCommand "dst-server-patched" {
+    nativeBuildInputs = [ pkgs.patchelf ];
+  } ''
+    mkdir -p $out/bin
+    # Wait for server to be installed, then patch it
+    cat > $out/bin/dst-server-wrapper <<'EOF'
+#!/bin/sh
+if [ ! -f "${serverBin}" ]; then
+  echo "DST server binary not found at ${serverBin}"
+  exit 1
+fi
 
-  wrappedServerBin = "${dstFhs}/bin/dst-server-fhs";
+# Patch the binary to use libcurl instead of libcurl-gnutls
+${pkgs.patchelf}/bin/patchelf --replace-needed libcurl-gnutls.so.4 libcurl.so.4 "${serverBin}" 2>/dev/null || true
+
+# Run with proper library path
+export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [ curl glibc stdenv.cc.cc.lib zlib ])}"
+exec "${serverBin}" "$@"
+EOF
+    chmod +x $out/bin/dst-server-wrapper
+  '';
+
+  wrappedServerBin = "${patchedServerBin}/bin/dst-server-wrapper";
 
   # Generate dedicated_server_mods_setup.lua from mods list
   modsSetupContent = ''
