@@ -21,9 +21,11 @@ let
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
   # Build curl with GnuTLS support (DST server requires libcurl-gnutls.so.4)
+  # Disable http3Support to avoid ngtcp2 dependency issues with GnuTLS
   curlWithGnutls = pkgs.curl.override {
     gnutlsSupport = true;
     opensslSupport = false;
+    http3Support = false;
   };
 
   # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
