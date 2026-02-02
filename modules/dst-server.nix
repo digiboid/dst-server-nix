@@ -20,9 +20,15 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Wrapper script - nixpkgs curl already includes libcurl-gnutls.so.4
+  # Build curl with GnuTLS support (DST server requires libcurl-gnutls.so.4)
+  curlWithGnutls = pkgs.curl.override {
+    gnutlsSupport = true;
+    opensslSupport = false;
+  };
+
+  # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [ curl glibc stdenv.cc.cc.lib zlib gnutls nettle ])}"
+    export LD_LIBRARY_PATH="${lib.makeLibraryPath [ curlWithGnutls pkgs.glibc pkgs.stdenv.cc.cc.lib pkgs.zlib pkgs.gnutls pkgs.nettle ]}"
     exec ${serverBin} "$@"
   '';
 
