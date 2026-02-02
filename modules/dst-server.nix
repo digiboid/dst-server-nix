@@ -20,17 +20,30 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Build curl with GnuTLS support (DST server requires libcurl-gnutls.so.4)
-  # Disable http3Support to avoid ngtcp2 dependency issues with GnuTLS
-  curlWithGnutls = pkgs.curl.override {
-    gnutlsSupport = true;
-    opensslSupport = false;
-    http3Support = false;
+  # Extract libcurl-gnutls from Debian package
+  # DST server needs CURL_GNUTLS_3 symbol (older curl version)
+  libcurlGnutls = pkgs.stdenv.mkDerivation {
+    pname = "libcurl-gnutls";
+    version = "7.64.0";
+
+    src = pkgs.fetchurl {
+      url = "http://snapshot.debian.org/archive/debian/20190323T031635Z/pool/main/c/curl/libcurl3-gnutls_7.64.0-2_amd64.deb";
+      sha256 = "sha256-hH0nei2qPTKkHTmH8OAkRdqV5oxjHoqwZPU5iK6JVQQ=";
+    };
+
+    nativeBuildInputs = [ pkgs.dpkg ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libcurl-gnutls.so* $out/lib/
+    '';
   };
 
   # Wrapper script with libcurl-gnutls in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${lib.makeLibraryPath [ curlWithGnutls pkgs.glibc pkgs.stdenv.cc.cc.lib pkgs.zlib pkgs.gnutls pkgs.nettle ]}"
+    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls nettle libidn2 nghttp2 libpsl rtmpdump openldap ])}"
     exec ${serverBin} "$@"
   '';
 
