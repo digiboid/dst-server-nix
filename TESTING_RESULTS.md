@@ -1,8 +1,8 @@
 # DST Server Testing Results
 
-## Status: Libraries Resolved ✓
+## Status: FULLY OPERATIONAL ✓
 
-All library dependencies have been successfully resolved. The server now starts and retrieves the cluster token. Remaining issues are configuration-related, not library dependencies.
+All issues have been successfully resolved. The Don't Starve Together dedicated server is now running with both Master and Caves shards operational.
 
 ## Issues Found and Fixed
 
@@ -27,6 +27,12 @@ The DST server binary requires several specific library versions that aren't ava
 
 **Problem:** Initial hash was incorrect, causing build to fail silently
 **Fix:** Updated to correct hash `sha256-WjhMdzrmiwx5BezAq/XkWSV5S2eWdIZtd4PYh4b/sNI=`
+
+### 4. Working Directory Issue
+
+**Problem:** Server failed to load `scripts/main.lua` with error "DoLuaFile Could not load lua file scripts/main.lua"
+**Cause:** DST server expects to run from the `bin64` directory to correctly locate `../data` directory containing game scripts
+**Fix:** Modified wrapper script to `cd ${cfg.serverInstallDir}/bin64` before executing the server binary
 
 ## Testing Process
 
@@ -75,16 +81,22 @@ libsasl2 = pkgs.stdenv.mkDerivation {
 };
 ```
 
-### Updated Library Path
+### Updated Wrapper Script
 
 ```nix
 wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
   export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${libsasl2}/lib:${lib.makeLibraryPath (with pkgs; [
     glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs
   ])}"
-  exec ${serverBin} "$@"
+  cd ${cfg.serverInstallDir}/bin64
+  exec ./dontstarve_dedicated_server_nullrenderer_x64 "$@"
 '';
 ```
+
+The wrapper now:
+- Sets LD_LIBRARY_PATH with all required libraries (modern NixOS and old Debian packages)
+- Changes to bin64 directory before execution (required for server to find game data)
+- Executes the server binary directly from bin64
 
 ### Fixed User Creation
 
@@ -128,29 +140,55 @@ cat /nix/store/*-dst-server-wrapper | grep LD_LIBRARY_PATH
 
 ## Final Status
 
-**ALL LIBRARY DEPENDENCIES RESOLVED** ✓
+**SERVER FULLY OPERATIONAL** ✓✓✓
 
 The server now successfully:
-- Loads all required libraries
-- Starts the DST server binary
-- Retrieves the cluster token from `/var/lib/dst-server/DoNotStarveTogether/Cluster_1/cluster_token.txt`
-- Begins game initialization
+- Loads all required libraries (both NixOS and Debian packages)
+- Starts the DST server binary from correct working directory
+- Retrieves the cluster token
+- Loads all Lua game scripts
+- Generates world maps for both Master and Caves shards
+- Establishes inter-shard communication
+- Listens on all configured network ports
+- Both shards running and synchronized
 
-Current startup logs show:
+### Service Status
 ```
-[00:00:00]: Token retrieved from: /var/lib/dst-server//DoNotStarveTogether/Cluster_1/cluster_token.txt
-[00:00:00]: Error loading main.lua
-[00:00:00]: Error during game initialization!
+dst-server-master.service: Active (running)
+  Memory: 1.1GB, Tasks: 17
+  Validating portals and syncing world settings with caves shard
+
+dst-server-caves.service: Active (running)
+  Memory: 967MB, Tasks: 17
+  Connected to master shard, secondary shard LUA ready
+  Sim paused (waiting for players - pauseWhenEmpty enabled)
 ```
 
-The "Error loading main.lua" is a configuration/path issue, not a library dependency issue. This needs investigation of the server's data directory structure and configuration files.
+### Network Ports Listening
+```
+UDP 10998 (127.0.0.1) - Shard master communication (localhost only)
+UDP 10999 (0.0.0.0)   - Master game port
+UDP 11000 (0.0.0.0)   - Caves game port
+UDP 12346 (0.0.0.0)   - Master Steam port
+UDP 12347 (0.0.0.0)   - Caves Steam port
+```
 
-## Known Limitations
+### Sample Logs
+```
+[00:00:12]: Done forest map gen!
+[00:00:12]: Generation complete, injecting world entities.
+[00:00:12]: WorldSim::SimThread::Main() complete
+[00:00:12]: Serializing world: session/749DFB4545F0404F/0000000002
+[00:00:16]: [Shard] secondary shard LUA is now ready!
+[00:00:16]: Sim paused
+```
 
-- Requires cluster token file at `/var/lib/dst-server/cluster_token.txt` (must be created manually before first start)
+## Setup Requirements
+
+- Cluster token file must exist at path specified by `clusterTokenFile` option
 - First startup downloads ~1GB server files (takes 3-5 minutes)
 - Each service restart triggers validation (takes 1-2 minutes)
-- Current crash during initialization needs configuration debugging (not library-related)
+- Firewall ports must be opened if `openFirewall = false` (default)
 
 ## SETUP_GUIDE.md Updates
 
