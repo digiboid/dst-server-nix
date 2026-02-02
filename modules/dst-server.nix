@@ -84,9 +84,30 @@ let
     '';
   };
 
+  # Extract libsasl2 from Debian package
+  # DST server needs libsasl2.so.2 (older cyrus-sasl version)
+  libsasl2 = pkgs.stdenv.mkDerivation {
+    pname = "libsasl2-2";
+    version = "2.1.27";
+
+    src = pkgs.fetchurl {
+      url = "http://snapshot.debian.org/archive/debian/20190323T031635Z/pool/main/c/cyrus-sasl2/libsasl2-2_2.1.27%2Bdfsg-1_amd64.deb";
+      sha256 = "sha256-1YdvsZPEdqIiChs243eWLc0Cc+P4oupC6bWZ/0gOtlU=";
+    };
+
+    nativeBuildInputs = [ pkgs.dpkg ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libsasl2.so* $out/lib/
+    '';
+  };
+
   # Wrapper script with old Debian libraries in LD_LIBRARY_PATH
   wrappedServerBin = pkgs.writeShellScript "dst-server-wrapper" ''
-    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs cyrus_sasl ])}"
+    export LD_LIBRARY_PATH="${libcurlGnutls}/lib:${libnettle6}/lib:${libldap24}/lib:${libsasl2}/lib:${lib.makeLibraryPath (with pkgs; [ glibc stdenv.cc.cc.lib zlib gnutls libidn2 nghttp2 libpsl rtmpdump libssh2 krb5 e2fsprogs ])}"
     exec ${serverBin} "$@"
   '';
 
