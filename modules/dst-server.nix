@@ -20,10 +20,32 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
-  # Create libcurl-gnutls compatibility layer
-  curlCompat = pkgs.runCommand "curl-compat" {} ''
-    mkdir -p $out/lib
-    ln -s ${pkgs.curl.out}/lib/libcurl.so.4 $out/lib/libcurl-gnutls.so.4
+  # Extract libcurl-gnutls from Ubuntu package
+  # DST server specifically requires this GnuTLS variant
+  libcurlGnutls = pkgs.stdenv.mkDerivation {
+    pname = "libcurl-gnutls";
+    version = "8.5.0";
+
+    src = pkgs.fetchurl {
+      url = "http://archive.ubuntu.com/ubuntu/pool/main/c/curl/libcurl3-gnutls_8.5.0-2ubuntu10.6_amd64.deb";
+      hash = "sha256-wJmRo004Y+JlzKGd+uiUgeAdtyaZ6RlSdBl5ntL90mU=";
+    };
+
+    nativeBuildInputs = [ pkgs.dpkg pkgs.autoPatchelfHook ];
+    buildInputs = with pkgs; [ gnutls nettle gmp libidn2 nghttp2 libpsl zlib ];
+
+    unpackPhase = "dpkg-deb -x $src .";
+
+    installPhase = ''
+      mkdir -p $out/lib
+      cp -P usr/lib/x86_64-linux-gnu/libcurl-gnutls.so* $out/lib/
+    '';
+  };
+
+  # Wrap the server with proper library path
+  wrappedServerBin = pkgs.writeShellScript "dst-server-wrapped" ''
+    export LD_LIBRARY_PATH="${lib.makeLibraryPath [ libcurlGnutls pkgs.gnutls pkgs.nettle pkgs.gmp pkgs.libidn2 pkgs.nghttp2 pkgs.libpsl pkgs.zlib ]}"
+    exec ${serverBin} "$@"
   '';
 
   # Generate dedicated_server_mods_setup.lua from mods list
@@ -112,7 +134,7 @@ EOF
     # Update mods using DST server
     if [ -f "${serverBin}" ] && [ ${toString (length cfg.mods)} -gt 0 ]; then
       echo "Updating mods..."
-      ${serverBin} \
+      ${wrappedServerBin} \
         -only_update_server_mods \
         -persistent_storage_root ${cfg.dataDir} \
         -ugc_directory ${cfg.dataDir}/.klei/ugc \
@@ -139,7 +161,7 @@ EOF
       RestartSec = "30s";
       TimeoutStopSec = "720s";
 
-      ExecStart = "${serverBin} -skip_update_server_mods -persistent_storage_root ${cfg.dataDir} -ugc_directory ${cfg.dataDir}/.klei/ugc -cluster Cluster_1 -shard ${shardName}";
+      ExecStart = "${wrappedServerBin} -skip_update_server_mods -persistent_storage_root ${cfg.dataDir} -ugc_directory ${cfg.dataDir}/.klei/ugc -cluster Cluster_1 -shard ${shardName}";
 
       # Hardening
       NoNewPrivileges = true;
@@ -149,20 +171,10 @@ EOF
       ReadWritePaths = [ cfg.dataDir cfg.serverInstallDir ];
     };
 
-    path = with pkgs; [ steamcmd bash coreutils glibc curl ];
+    path = with pkgs; [ steamcmd bash coreutils ];
 
     environment = {
       HOME = cfg.dataDir;
-      LD_LIBRARY_PATH = lib.makeLibraryPath ([
-        pkgs.glibc
-        pkgs.stdenv.cc.cc.lib
-        pkgs.curl
-        pkgs.libGL
-        pkgs.libpulseaudio
-        pkgs.openal
-        pkgs.SDL2
-        curlCompat
-      ]);
     };
   };
 
