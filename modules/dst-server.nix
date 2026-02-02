@@ -123,7 +123,7 @@ EOF
     description = "Don't Starve Together ${shardName} Shard";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ] ++ optional (shardName == "Caves") "dst-server-master.service";
-    requires = optional (shardName == "Caves") [ "dst-server-master.service" ];
+    requires = optionals (shardName == "Caves") [ "dst-server-master.service" ];
 
     preStart = toString (makePreStartScript shardName);
 
