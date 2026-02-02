@@ -20,6 +20,12 @@ let
     then "${cfg.serverInstallDir}/bin64/dontstarve_dedicated_server_nullrenderer_x64"
     else "${cfg.serverInstallDir}/bin/dontstarve_dedicated_server_nullrenderer";
 
+  # Create libcurl-gnutls compatibility layer
+  curlCompat = pkgs.runCommand "curl-compat" {} ''
+    mkdir -p $out/lib
+    ln -s ${pkgs.curl.out}/lib/libcurl.so.4 $out/lib/libcurl-gnutls.so.4
+  '';
+
   # Generate dedicated_server_mods_setup.lua from mods list
   modsSetupContent = ''
     ${concatMapStringsSep "\n" (modId: ''ServerModSetup("${modId}")'') cfg.mods}
@@ -147,14 +153,15 @@ EOF
 
     environment = {
       HOME = cfg.dataDir;
-      LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
-        glibc
-        stdenv.cc.cc.lib
-        curl
-        libGL
-        libpulseaudio
-        openal
-        SDL2
+      LD_LIBRARY_PATH = lib.makeLibraryPath ([
+        pkgs.glibc
+        pkgs.stdenv.cc.cc.lib
+        pkgs.curl
+        pkgs.libGL
+        pkgs.libpulseaudio
+        pkgs.openal
+        pkgs.SDL2
+        curlCompat
       ]);
     };
   };
