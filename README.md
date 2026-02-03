@@ -24,11 +24,25 @@ nix run .#generate-token
 
 Visit https://accounts.klei.com/account/game/servers?game=DontStarveTogether and follow the instructions.
 
-Save your token to a file:
+**Option A: Direct Configuration (Simpler)**
+```nix
+services.dst-server = {
+  clusterToken = "pds-g^KU_your_token_here";
+  # ... other options
+};
+```
+
+**Option B: File-based (More Secure)**
 ```bash
 sudo mkdir -p /var/lib/dst-server
 echo "YOUR_TOKEN_HERE" | sudo tee /var/lib/dst-server/cluster_token.txt
 sudo chmod 600 /var/lib/dst-server/cluster_token.txt
+```
+```nix
+services.dst-server = {
+  clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+  # ... other options
+};
 ```
 
 ### 2. Add to Your NixOS Configuration
@@ -53,7 +67,7 @@ Add this flake to your system's `flake.nix`:
             enable = true;
             clusterName = "My NixOS Server";
             clusterDescription = "A friendly DST server";
-            clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+            clusterToken = "pds-g^KU_your_token_here";  # Or use clusterTokenFile
             maxPlayers = 16;
             gameMode = "endless";
             openFirewall = true;
@@ -79,7 +93,7 @@ Or in traditional NixOS configuration:
   services.dst-server = {
     enable = true;
     clusterName = "My NixOS Server";
-    clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+    clusterToken = "pds-g^KU_your_token_here";  # Or use clusterTokenFile
     openFirewall = true;
   };
 }
@@ -111,11 +125,14 @@ journalctl -u dst-server-master.service -f
 | `clusterName` | string | `"NixOS DST Server"` | Server name in browser |
 | `clusterDescription` | string | `"A Don't Starve..."` | Server description |
 | `clusterPassword` | string | `""` | Password (empty = no password) |
-| `clusterTokenFile` | path | *required* | Path to cluster token file |
+| `clusterTokenFile` | path\|null | `null` | Path to cluster token file (either this or `clusterToken` required) |
+| `clusterToken` | string\|null | `null` | Cluster token string (either this or `clusterTokenFile` required) ⚠️ |
 | `maxPlayers` | int (1-64) | `16` | Maximum players |
 | `gameMode` | enum | `"endless"` | `survival`, `endless`, or `wilderness` |
 | `pvpEnabled` | bool | `false` | Enable PvP combat |
 | `pauseWhenEmpty` | bool | `true` | Pause when no players |
+
+⚠️ **Security Warning**: `clusterToken` stores the token in the Nix store (world-readable). For better security, use `clusterTokenFile` instead.
 
 ### Port Configuration
 
@@ -151,7 +168,7 @@ journalctl -u dst-server-master.service -f
 services.dst-server = {
   enable = true;
   clusterName = "Modded Server";
-  clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+  clusterToken = "pds-g^KU_your_token_here";
   maxPlayers = 32;
   openFirewall = true;
 
@@ -169,7 +186,7 @@ services.dst-server = {
 services.dst-server = {
   enable = true;
   clusterName = "PvP Arena";
-  clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+  clusterToken = "pds-g^KU_your_token_here";
   gameMode = "survival";
   pvpEnabled = true;
   pauseWhenEmpty = false;
@@ -183,7 +200,7 @@ services.dst-server = {
 ```nix
 services.dst-server = {
   enable = true;
-  clusterTokenFile = "/var/lib/dst-server/cluster_token.txt";
+  clusterToken = "pds-g^KU_your_token_here";
 
   ports = {
     master = 20999;
