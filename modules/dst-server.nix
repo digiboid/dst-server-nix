@@ -229,6 +229,7 @@ EOF
       Group = cfg.group;
       Restart = "on-failure";
       RestartSec = "30s";
+      TimeoutStartSec = "3600s";  # Allow 60 minutes for initial server download
       TimeoutStopSec = "720s";
 
       ExecStart = "${wrappedServerBin} -skip_update_server_mods -persistent_storage_root ${cfg.dataDir} -ugc_directory ${cfg.dataDir}/.klei/ugc -cluster Cluster_1 -shard ${shardName}";
