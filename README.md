@@ -12,6 +12,16 @@ A NixOS module for running a Don't Starve Together dedicated server natively (wi
 - Automatic firewall configuration
 - Helper scripts for management
 
+## Requirements
+
+**IMPORTANT**: The DST server binary requires `programs.nix-ld.enable = true;` in your NixOS configuration. Add this to your system configuration before enabling the DST server:
+
+```nix
+programs.nix-ld.enable = true;
+```
+
+This provides the dynamic linker compatibility layer needed for the DST server binary to run on NixOS.
+
 ## Quick Start
 
 ### 1. Get a Cluster Token
@@ -347,6 +357,26 @@ Common issues:
 - Cluster token file has wrong permissions (should be 600)
 - Ports already in use
 - Insufficient disk space
+- **"Could not start dynamically linked executable"** - Missing `programs.nix-ld.enable = true;` (see Requirements section)
+
+### "Could not start dynamically linked executable"
+
+If you see this error:
+```
+Could not start dynamically linked executable: ./dontstarve_dedicated_server_nullrenderer_x64
+NixOS cannot run dynamically linked executables intended for generic
+linux environments out of the box.
+```
+
+**Solution**: Enable nix-ld in your NixOS configuration:
+```nix
+programs.nix-ld.enable = true;
+```
+
+Then rebuild:
+```bash
+sudo nixos-rebuild switch
+```
 
 ### Mods not loading
 
