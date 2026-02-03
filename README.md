@@ -258,6 +258,64 @@ To preserve manual changes:
 2. Don't delete config files
 3. Use `extraClusterConfig`, `extraMasterConfig`, `extraCavesConfig` options to append additional settings
 
+## Updating Configuration
+
+### Understanding Non-Destructive Configuration
+
+The module uses **non-destructive configuration** - config files are only created if they don't exist. This preserves manual edits but means changes to your NixOS configuration won't automatically update existing config files.
+
+### Applying NixOS Configuration Changes
+
+If you change options like `clusterName`, `clusterPassword`, `gameMode`, etc. in your NixOS configuration, you need to regenerate the config files:
+
+**Option 1: Delete and Regenerate (Recommended)**
+
+```bash
+# Stop services
+systemctl stop dst-server-caves.service dst-server-master.service
+
+# Remove existing config files (they'll regenerate with new settings)
+sudo rm /var/lib/dst-server/DoNotStarveTogether/Cluster_1/cluster.ini
+sudo rm /var/lib/dst-server/DoNotStarveTogether/Cluster_1/Master/server.ini
+sudo rm /var/lib/dst-server/DoNotStarveTogether/Cluster_1/Caves/server.ini
+
+# If using flake with path input, update it first
+cd /path/to/your/nixconf
+nix flake update dst-server
+
+# Rebuild to apply changes
+sudo nixos-rebuild switch --flake .#hostname
+# Or without flake: sudo nixos-rebuild switch
+```
+
+**Option 2: Manual Edit (Quick Fix)**
+
+```bash
+# Edit cluster config directly
+sudo nano /var/lib/dst-server/DoNotStarveTogether/Cluster_1/cluster.ini
+
+# Make your changes, then restart services
+systemctl restart dst-server-caves.service dst-server-master.service
+```
+
+**Note**: Option 1 ensures your NixOS configuration remains the source of truth and changes persist across system rebuilds.
+
+### When to Regenerate Configs
+
+Regenerate config files when you change:
+- `clusterName` - Server name in browser
+- `clusterDescription` - Server description
+- `clusterPassword` - Server password
+- `gameMode` - Game mode (survival/endless/wilderness)
+- `maxPlayers` - Maximum player count
+- `pvpEnabled` - PvP setting
+- `pauseWhenEmpty` - Pause behavior
+
+You don't need to regenerate for:
+- Port changes (read from systemd service config)
+- Mod list changes (handled separately)
+- `autoUpdate`, `openFirewall` settings (not in config files)
+
 ## Troubleshooting
 
 ### Server won't start
