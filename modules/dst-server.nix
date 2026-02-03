@@ -126,14 +126,20 @@ let
     mkdir -p ${cfg.dataDir}/.klei/ugc
     mkdir -p ${cfg.dataDir}/DoNotStarveTogether/Agreements
 
-    # Copy cluster token and remove trailing newline
-    if [ -f "${cfg.clusterTokenFile}" ]; then
-      tr -d '\n' < "${cfg.clusterTokenFile}" > ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster_token.txt
+    # Write cluster token (from file or direct string)
+    ${optionalString (cfg.clusterTokenFile != null) ''
+      if [ -f "${cfg.clusterTokenFile}" ]; then
+        tr -d '\n' < "${cfg.clusterTokenFile}" > ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster_token.txt
+        chmod 600 ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster_token.txt
+      else
+        echo "Error: Cluster token file not found at ${cfg.clusterTokenFile}"
+        exit 1
+      fi
+    ''}
+    ${optionalString (cfg.clusterToken != null) ''
+      echo -n "${cfg.clusterToken}" > ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster_token.txt
       chmod 600 ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster_token.txt
-    else
-      echo "Error: Cluster token file not found at ${cfg.clusterTokenFile}"
-      exit 1
-    fi
+    ''}
 
     # Copy default configs if they don't exist (non-destructive)
     if [ ! -f ${cfg.dataDir}/DoNotStarveTogether/Cluster_1/cluster.ini ]; then
@@ -265,10 +271,27 @@ in {
     };
 
     clusterTokenFile = mkOption {
-      type = types.path;
+      type = types.nullOr types.path;
+      default = null;
       description = ''
-        Path to the cluster token file. This is required to run a DST server.
+        Path to the cluster token file.
         Get your token from https://accounts.klei.com/account/game/servers?game=DontStarveTogether
+
+        Either clusterTokenFile or clusterToken must be specified, but not both.
+      '';
+    };
+
+    clusterToken = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Cluster token as a string (alternative to clusterTokenFile).
+        Get your token from https://accounts.klei.com/account/game/servers?game=DontStarveTogether
+
+        WARNING: This will store the token in the Nix store (world-readable).
+        For better security, use clusterTokenFile with appropriate permissions.
+
+        Either clusterTokenFile or clusterToken must be specified, but not both.
       '';
     };
 
@@ -397,6 +420,13 @@ in {
   };
 
   config = mkIf cfg.enable {
+    # Validate cluster token configuration
+    assertions = [
+      {
+        assertion = (cfg.clusterToken != null) != (cfg.clusterTokenFile != null);
+        message = "Exactly one of services.dst-server.clusterToken or services.dst-server.clusterTokenFile must be specified.";
+      }
+    ];
     # Create user and group
     users.users.${cfg.user} = {
       isSystemUser = true;
